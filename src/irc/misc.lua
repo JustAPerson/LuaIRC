@@ -232,7 +232,7 @@ end
 -- @param ... Arguments to fn
 -- @return The return values of fn, if it was successfully called
 function _try_call(fn, ...)
-    if base.type(fn) == "function" then
+    if fn then
         return fn(...)
     end
 end
@@ -246,7 +246,7 @@ end
 -- @param ... Arguments to fn
 -- @return The return values of fn, if it was successfully called
 function _try_call_warn(msg, fn, ...)
-    if base.type(fn) == "function" then
+    if fn then
         return fn(...)
     else
         irc_debug._warn(msg)
