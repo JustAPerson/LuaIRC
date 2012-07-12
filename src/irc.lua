@@ -110,7 +110,11 @@ end
 
 -- callback {{{
 local function callback(name, ...)
-    return misc._try_call(user_handlers[name], ...)
+    local list = user_handlers[name];
+    if not list then return; end
+    for _, func in base.next, list do
+        func(...);
+    end
 end
 -- }}}
 -- }}}
@@ -912,16 +916,18 @@ end
 -- register_callback {{{
 ---
 -- Register a user function to be called when a specific event occurs.
+-- Multiple functions can be registered to the same event.
 -- @param name Name of the event
 -- @param fn   Function to call when the event occurs, or nil to clear the
 --             callback for this event
--- @return Value of the original callback for this event (or nil if no previous
---         callback had been set)
 function register_callback(name, fn)
     base.assert(base.type(fn) == "function")
-    local old_handler = user_handlers[name]
-    user_handlers[name] = fn
-    return old_handler
+    local list = user_handlers[name];
+    if not list then
+        list = {};
+        user_handlers[name] = list;
+    end
+    list[#list+1] = fn;
 end
 -- }}}
 -- }}}
