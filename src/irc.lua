@@ -918,7 +918,7 @@ end
 -- @return Value of the original callback for this event (or nil if no previous
 --         callback had been set)
 function register_callback(name, fn)
-    assert(base.type(fn) == "function")
+    base.assert(base.type(fn) == "function")
     local old_handler = user_handlers[name]
     user_handlers[name] = fn
     return old_handler
