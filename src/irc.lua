@@ -11,6 +11,7 @@ local message =   require 'irc.message'
 local misc =      require 'irc.misc'
 local socket =    require 'socket'
 local os =        require 'os'
+local io =        require 'io'
 local string =    require 'string'
 local table =     require 'table'
 -- }}}
@@ -48,6 +49,7 @@ local ctcp_handlers = {}
 local user_handlers = {}
 local serverinfo = {}
 local ip = nil
+local timers = {};
 -- }}}
 
 -- defaults {{{
@@ -62,11 +64,20 @@ OUTFILE = nil         -- file to send debug output to - nil is stdout
 -- }}}
 
 -- private functions {{{
+-- callback {{{
+local function callback(name, ...)
+    local list = user_handlers[name];
+    if not list then return; end
+    for _, func in base.next, list do
+        func(...);
+    end
+end
+-- }}}
 -- main_loop_iter {{{
-local function main_loop_iter()
+local function main_loop_iter(time, dt)
     if #rsockets == 0 and #wsockets == 0 then return false end
-    local rready, wready, err = socket.select(rsockets, wsockets)
-    if err then irc_debug._err(err); return false; end
+    local rready, wready, err = socket.select(rsockets, wsockets, 0.1)
+    --if err then irc_debug._err(err); return false; end
 
     for _, sock in base.ipairs(rready) do
         local cb = socket.protect(rcallbacks[sock])
@@ -86,13 +97,31 @@ local function main_loop_iter()
         end
     end
 
+    callback("step", dt);
+    for i, timer in base.next, timers do
+        if time > (timer.start + timer.length) then
+            if timer.func(time - timer.start) then  -- Timer return'd a value, keep it alive
+                timer.start = time;
+            else    -- Timer returned nil/false, kill it
+                timers[i] = nil;
+            end
+        end
+    end
+    
+    io:flush();
     return true
 end
 -- }}}
 
 -- begin_main_loop {{{
 local function begin_main_loop()
-    while main_loop_iter() do end
+    local os = os;
+    local time = 0;
+    local last = time;
+    while main_loop_iter(time, time - last) do
+        last = time;
+        time = socket.gettime();
+    end
 end
 -- }}}
 
@@ -105,16 +134,6 @@ local function incoming_message(sock)
                         handlers["on_" .. msg.command:lower()],
                         (misc._parse_user(msg.from)), base.unpack(msg.args))
     return true
-end
--- }}}
-
--- callback {{{
-local function callback(name, ...)
-    local list = user_handlers[name];
-    if not list then return; end
-    for _, func in base.next, list do
-        func(...);
-    end
 end
 -- }}}
 -- }}}
@@ -931,6 +950,21 @@ function register_callback(name, fn)
 end
 -- }}}
 -- }}}
+
+-- timer()
+--
+-- Register a function to be called after a certain amount of time.
+-- If the timer function returns true then the timer is reset.
+-- If it returns false/nil then it is destroyed.
+-- @param length the amount of time to wait in second
+-- @param fn Function to call when finished
+function timer(length, func)
+    timers[#timers + 1] = {
+        start = socket.gettime();
+        length = length;
+        func = func;
+    };
+end
 
 -- misc functions {{{
 -- send {{{
